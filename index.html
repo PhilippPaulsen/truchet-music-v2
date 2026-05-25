@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html class="dark" lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>TruchetStudio | Generative Music Dashboard</title>
+
+  <!-- Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.2/p5.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.9/Tone.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- Fonts & Icons -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet"/>
+
+  <!-- Tailwind Configuration -->
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#adc6ff",
+            "on-primary": "#002e69",
+            "primary-container": "#2f4470",
+            "on-primary-container": "#d8e2ff",
+            "secondary-container": "#474747",
+            "on-secondary-container": "#b6b5b4",
+            "tertiary-container": "#ef6719",
+            "on-tertiary-container": "#4c1a00",
+            "error-container": "#93000a",
+            "on-error-container": "#ffdad6",
+            "background": "#121414",
+            "on-background": "#e2e2e2",
+            "surface": "#121414",
+            "on-surface": "#e2e2e2",
+            "surface-container": "#1e2020",
+            "surface-container-low": "#1a1c1c",
+            "surface-container-high": "#282a2b",
+            "surface-container-highest": "#333535",
+            "on-surface-variant": "#c1c6d7",
+            "canvas-bg": "#000000",
+            "outline": "#8b90a0",
+            "outline-variant": "#414755"
+          },
+          fontFamily: {
+            sans: ["Hanken Grotesk", "sans-serif"],
+            mono: ["JetBrains Mono", "monospace"]
+          },
+          spacing: {
+            "margin-desktop": "32px",
+            "panel-width": "320px",
+            "margin-mobile": "16px"
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Custom Stylesheet (Scrollbars & Canvas Centering) -->
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body class="bg-background text-on-surface font-sans overflow-hidden min-h-screen flex flex-col antialiased select-none">
+
+  <!-- Top Navigation Bar -->
+  <header class="fixed top-0 left-0 w-full z-50 bg-background/80 dark:bg-background/80 backdrop-blur-xl border-b border-outline-variant/30 flex justify-between items-center px-margin-desktop py-4 h-16">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-primary text-3xl animate-pulse" data-icon="spatial_audio">spatial_audio</span>
+      <h1 class="font-mono text-xl font-bold tracking-tighter text-primary uppercase">TruchetStudio</h1>
+    </div>
+    <div class="flex items-center gap-6">
+      <span class="font-mono text-[10px] bg-primary/10 text-primary border border-primary/20 rounded px-2.5 py-1 tracking-widest uppercase">Live Session: D4_LAB</span>
+      <button id="theme-toggle" class="p-2 text-on-surface-variant hover:text-primary transition-colors active:scale-95 duration-200" aria-label="Toggle Theme">
+        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">dark_mode</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Dual-Column Responsive Page Grid -->
+  <div class="flex-1 flex pt-16 h-[calc(100vh-64px)] relative overflow-hidden">
+
+    <!-- Sidebar / Studio Controls (Hidden on Mobile, Visible on Tablet md:flex) -->
+    <aside class="hidden md:flex flex-col w-panel-width h-full bg-surface-container/60 backdrop-blur-2xl border-r border-outline-variant/20 p-6 space-y-6 overflow-y-auto custom-scrollbar z-40 select-none">
+      
+      <!-- Playback Controls Section -->
+      <section class="space-y-4">
+        <h3 class="font-mono text-xs text-outline uppercase tracking-wider">Playback</h3>
+        <div class="flex items-center gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/20">
+          <button id="play-button" class="w-12 h-12 rounded-full bg-primary text-on-primary flex items-center justify-center hover:scale-105 active:scale-90 transition-all shadow-md shadow-primary/10" aria-label="Play / Stop">
+            <span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+          </button>
+          <div class="flex-1 space-y-1">
+            <div class="flex justify-between font-mono text-[10px] text-on-surface-variant uppercase">
+              <span>Tempo</span>
+              <span id="bpm-val" class="text-primary font-bold">120 BPM</span>
+            </div>
+            <input id="speed" class="w-full h-1 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary" max="220" min="40" type="range" value="120"/>
+          </div>
+        </div>
+      </section>
+
+      <!-- Grid Dimensions & Symmetry Options -->
+      <section class="space-y-4">
+        <h3 class="font-mono text-xs text-outline uppercase tracking-wider">Sound Logic</h3>
+        <div class="space-y-3">
+          <div class="space-y-1">
+            <label class="font-mono text-[10px] text-on-surface-variant uppercase">Grid Size</label>
+            <select id="size" class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-lg text-sm py-2 px-3 focus:ring-1 focus:ring-primary focus:border-primary text-on-surface appearance-none cursor-pointer">
+              <option value="80">4 x 4 (Huge)</option>
+              <option value="40" selected>8 x 8 (Medium)</option>
+              <option value="20">16 x 16 (Standard)</option>
+              <option value="10">32 x 32 (Fine)</option>
+              <option value="5">64 x 64 (Ultra-Fine)</option>
+            </select>
+          </div>
+          <div class="space-y-1">
+            <label class="font-mono text-[10px] text-on-surface-variant uppercase">Symmetry</label>
+            <select id="symmetry" class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-lg text-sm py-2 px-3 focus:ring-1 focus:ring-primary focus:border-primary text-on-surface appearance-none cursor-pointer">
+              <option value="D4" selected>D4 (Square + Rotational)</option>
+              <option value="C4">C4 (Rotational)</option>
+              <option value="D2_s">D2_s (Mirror Symmetry)</option>
+              <option value="C2">C2 (Rotational Dual)</option>
+              <option value="D1_h">D1_h (Horizontal Mirror)</option>
+              <option value="D1_v">D1_v (Vertical Mirror)</option>
+              <option value="p1">p1 (Basic Shift)</option>
+              <option value="p2">p2 (Dual Repeat)</option>
+              <option value="pm_h">pm_h (Mirror Repeat Horiz)</option>
+              <option value="pm_v">pm_v (Mirror Repeat Vert)</option>
+              <option value="pg_h">pg_h (Glide Horizontal)</option>
+              <option value="cm_s">cm_s (Staggered Glide)</option>
+              <option value="pmm">pmm (Double Mirror)</option>
+              <option value="pmg_h">pmg_h (Double Glide)</option>
+              <option value="pmg_v">pmg_v (Vertical Double Glide)</option>
+              <option value="pgg">pgg (Diagonal Repeat)</option>
+              <option value="cmm">cmm (Staggered Rotational)</option>
+              <option value="p4">p4 (Fourfold Rotation)</option>
+              <option value="p4m">p4m (Full Symmetry p4m)</option>
+              <option value="p4g">p4g (Glide Fourfold Reflection)</option>
+            </select>
+          </div>
+          <div class="space-y-1">
+            <label class="font-mono text-[10px] text-on-surface-variant uppercase">Transformation</label>
+            <select id="transformation" class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-lg text-sm py-2 px-3 focus:ring-1 focus:ring-primary focus:border-primary text-on-surface appearance-none cursor-pointer">
+              <option value="None" selected>None</option>
+              <option value="Inversion">Inversion</option>
+              <option value="Retrograde">Retrograde</option>
+              <option value="Augmentation">Augmentation</option>
+              <option value="Canon">Canon (Layering Delay)</option>
+              <option value="Counterpoint">Counterpoint (Harmony Layer)</option>
+            </select>
+          </div>
+          <div class="space-y-1">
+            <label class="font-mono text-[10px] text-on-surface-variant uppercase">Sequencer Mode</label>
+            <select id="mode" class="w-full bg-surface-container-highest border border-outline-variant/20 rounded-lg text-sm py-2 px-3 focus:ring-1 focus:ring-primary focus:border-primary text-on-surface appearance-none cursor-pointer">
+              <option value="Melody">Melody (Linear Sequence)</option>
+              <option value="Harmony">Harmony (Dynamic Chords)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Musical Scales Selector (Interactive Button List) -->
+      <section class="space-y-4 flex-1 flex flex-col overflow-hidden">
+        <h3 class="font-mono text-xs text-outline uppercase tracking-wider">Musical Scales</h3>
+        <div class="grid grid-cols-1 gap-1.5 overflow-y-auto pr-1.5 custom-scrollbar flex-1 max-h-[160px]">
+          <button data-scale-index="0" class="flex items-center gap-3 bg-primary-container text-on-primary-container border border-primary/20 rounded-lg p-2.5 text-left transition-all active:scale-[0.98] duration-200">
+            <span class="material-symbols-outlined text-lg">music_note</span>
+            <span class="text-xs font-semibold">C Major</span>
+          </button>
+          <button data-scale-index="1" class="flex items-center gap-3 text-on-surface-variant hover:bg-secondary-container/50 border border-transparent rounded-lg p-2.5 text-left transition-all active:scale-[0.98] duration-200">
+            <span class="material-symbols-outlined text-lg">music_note</span>
+            <span class="text-xs font-semibold">C Minor</span>
+          </button>
+          <button data-scale-index="2" class="flex items-center gap-3 text-on-surface-variant hover:bg-secondary-container/50 border border-transparent rounded-lg p-2.5 text-left transition-all active:scale-[0.98] duration-200">
+            <span class="material-symbols-outlined text-lg">music_note</span>
+            <span class="text-xs font-semibold">C Major Pentatonic</span>
+          </button>
+          <button data-scale-index="3" class="flex items-center gap-3 text-on-surface-variant hover:bg-secondary-container/50 border border-transparent rounded-lg p-2.5 text-left transition-all active:scale-[0.98] duration-200">
+            <span class="material-symbols-outlined text-lg">music_note</span>
+            <span class="text-xs font-semibold">C Minor Pentatonic</span>
+          </button>
+          <button data-scale-index="4" class="flex items-center gap-3 text-on-surface-variant hover:bg-secondary-container/50 border border-transparent rounded-lg p-2.5 text-left transition-all active:scale-[0.98] duration-200">
+            <span class="material-symbols-outlined text-lg">music_note</span>
+            <span class="text-xs font-semibold">C Blues Scale</span>
+          </button>
+          <button data-scale-index="5" class="flex items-center gap-3 text-on-surface-variant hover:bg-secondary-container/50 border border-transparent rounded-lg p-2.5 text-left transition-all active:scale-[0.98] duration-200">
+            <span class="material-symbols-outlined text-lg">music_note</span>
+            <span class="text-xs font-semibold">C Harmonic Minor</span>
+          </button>
+          <button data-scale-index="6" class="flex items-center gap-3 text-on-surface-variant hover:bg-secondary-container/50 border border-transparent rounded-lg p-2.5 text-left transition-all active:scale-[0.98] duration-200">
+            <span class="material-symbols-outlined text-lg">music_note</span>
+            <span class="text-xs font-semibold">C Lydian</span>
+          </button>
+          <button data-scale-index="7" class="flex items-center gap-3 text-on-surface-variant hover:bg-secondary-container/50 border border-transparent rounded-lg p-2.5 text-left transition-all active:scale-[0.98] duration-200">
+            <span class="material-symbols-outlined text-lg">music_note</span>
+            <span class="text-xs font-semibold">C Mixolydian</span>
+          </button>
+          <button data-scale-index="8" class="flex items-center gap-3 text-on-surface-variant hover:bg-secondary-container/50 border border-transparent rounded-lg p-2.5 text-left transition-all active:scale-[0.98] duration-200">
+            <span class="material-symbols-outlined text-lg">music_note</span>
+            <span class="text-xs font-semibold">C Dorian</span>
+          </button>
+          <button data-scale-index="9" class="flex items-center gap-3 text-on-surface-variant hover:bg-secondary-container/50 border border-transparent rounded-lg p-2.5 text-left transition-all active:scale-[0.98] duration-200">
+            <span class="material-symbols-outlined text-lg">music_note</span>
+            <span class="text-xs font-semibold">C Phrygian</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Active Instrument Selection (Pill button group) -->
+      <section class="space-y-4">
+        <h3 class="font-mono text-xs text-outline uppercase tracking-wider">Instrument</h3>
+        <div class="flex flex-wrap gap-2">
+          <button data-instrument="Grand Piano" class="px-3 py-1.5 bg-primary text-on-primary rounded-full font-mono text-[10px] tracking-wider uppercase cursor-pointer hover:scale-[1.03] transition-all">Grand Piano</button>
+          <button data-instrument="FM Synth" class="px-3 py-1.5 bg-surface-container-highest text-on-surface-variant rounded-full font-mono text-[10px] tracking-wider uppercase cursor-pointer hover:bg-secondary-container/50 transition-colors">FM Synth</button>
+          <button data-instrument="Wavetable" class="px-3 py-1.5 bg-surface-container-highest text-on-surface-variant rounded-full font-mono text-[10px] tracking-wider uppercase cursor-pointer hover:bg-secondary-container/50 transition-colors">Wavetable</button>
+        </div>
+      </section>
+
+      <!-- Action Exporters -->
+      <section class="grid grid-cols-2 gap-2 pt-2">
+        <button id="btnRegenerate" class="py-2.5 px-3 bg-surface-container-highest text-on-surface font-mono text-xs font-semibold rounded-lg hover:bg-secondary-container/85 border border-outline-variant/30 flex items-center justify-center gap-1 active:scale-95 transition-all">
+          <span class="material-symbols-outlined text-sm">refresh</span> Regenerate
+        </button>
+        <button id="btnExportPattern" class="py-2.5 px-3 bg-surface-container-highest text-on-surface font-mono text-xs font-semibold rounded-lg hover:bg-secondary-container/85 border border-outline-variant/30 flex items-center justify-center gap-1 active:scale-95 transition-all">
+          <span class="material-symbols-outlined text-sm">photo_camera</span> Export PNG
+        </button>
+        <button id="btnExportAudio" class="col-span-2 py-3 bg-on-surface text-surface font-mono text-xs font-bold rounded-lg hover:bg-on-surface/90 flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md">
+          <span class="material-symbols-outlined text-base">download_2</span> Record & Export WAV
+        </button>
+      </section>
+    </aside>
+
+    <!-- Main Canvas Area -->
+    <main class="flex-1 h-full relative overflow-hidden bg-canvas-bg flex items-center justify-center p-6">
+      
+      <!-- Centralized Interactive Canvas Wrapper -->
+      <div id="canvas-container" class="relative z-10 w-full h-full flex items-center justify-center">
+        <!-- p5.js dynamically injects canvas here -->
+      </div>
+
+      <!-- Blueprint aesthetic grid ticks -->
+      <div class="absolute inset-0 blueprint-ticks opacity-[0.03] pointer-events-none"></div>
+
+      <!-- Canvas Overlay Stats HUD -->
+      <div class="absolute bottom-6 right-6 z-20 space-y-2 pointer-events-none select-none">
+        <div class="glass-panel bg-surface-container-low/40 p-4 rounded-xl border border-outline-variant/10 shadow-lg min-w-[120px]">
+          <div class="flex flex-col font-mono space-y-1">
+            <span class="text-on-surface-variant/40 text-[9px] tracking-wider uppercase font-bold">GRID TILES</span>
+            <span id="active-tiles-val" class="text-primary text-xl font-bold tracking-tight">64</span>
+            <span class="text-on-surface-variant/40 text-[9px] tracking-wider uppercase font-bold pt-2">DYNAMICS</span>
+            <span class="text-primary text-sm font-semibold tracking-tight">MEZZO-FORTE</span>
+          </div>
+        </div>
+        <div class="flex justify-end pr-1">
+          <span class="font-mono text-[8px] text-outline/40 uppercase tracking-widest">Truchet Core v3.0 // IU Demos</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- Mobile Navigation (Visible only on mobile devices, hidden on md) -->
+    <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center py-3 bg-surface-container-high/90 dark:bg-surface-container-high/90 backdrop-blur-2xl border-t border-outline-variant/30 shadow-lg md:hidden rounded-t-2xl">
+      <button class="flex flex-col items-center justify-center text-on-surface-variant" onclick="document.querySelector('aside').classList.toggle('hidden'); document.querySelector('aside').classList.toggle('fixed'); document.querySelector('aside').classList.toggle('left-0'); document.querySelector('aside').classList.toggle('top-0'); document.querySelector('aside').classList.toggle('pt-20'); document.querySelector('aside').classList.toggle('h-full');">
+        <span class="material-symbols-outlined text-2xl">tune</span>
+        <span class="font-mono text-[9px] tracking-tighter uppercase mt-0.5">Controls</span>
+      </button>
+      <div class="flex flex-col items-center justify-center">
+        <button id="play-button-mobile" onclick="document.getElementById('play-button').click()" class="bg-primary text-on-primary rounded-full w-12 h-12 flex items-center justify-center shadow-lg active:scale-90 transition-all">
+          <span class="material-symbols-outlined text-3xl">play_arrow</span>
+        </button>
+      </div>
+      <button class="flex flex-col items-center justify-center text-on-surface-variant" onclick="document.getElementById('btnRegenerate').click()">
+        <span class="material-symbols-outlined text-2xl">refresh</span>
+        <span class="font-mono text-[9px] tracking-tighter uppercase mt-0.5">Random</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- Entry Script Loader (ES Module) -->
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
